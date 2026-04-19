@@ -131,7 +131,10 @@ def run() -> int:
         log.info(
             "Frost-stasjoner for %s: %s",
             loc.name,
-            ", ".join(f"{s.name} ({s.distance_km:.1f} km)" for s in stations),
+            ", ".join(
+                f"{s.name} ({s.distance_km:.1f} km @ {s.bearing_deg:.0f}°)"
+                for s in stations
+            ),
         )
 
         try:

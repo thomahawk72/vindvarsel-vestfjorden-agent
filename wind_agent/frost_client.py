@@ -41,6 +41,9 @@ class Station:
     lat: float
     lon: float
     distance_km: float
+    # Retning i grader fra lokasjonen til stasjonen (0° = nord, 90° = øst).
+    # Brukes til å vurdere om stasjonen ligger "oppstrøms" for vinden.
+    bearing_deg: float
 
 
 @dataclass(frozen=True)
@@ -81,6 +84,18 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         * math.sin(dlon / 2) ** 2
     )
     return 2 * r * math.asin(math.sqrt(a))
+
+
+def _bearing_deg(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Initiell peiling fra (lat1, lon1) mot (lat2, lon2), 0°=N, 90°=Ø."""
+    lat1_r = math.radians(lat1)
+    lat2_r = math.radians(lat2)
+    dlon_r = math.radians(lon2 - lon1)
+    y = math.sin(dlon_r) * math.cos(lat2_r)
+    x = math.cos(lat1_r) * math.sin(lat2_r) - math.sin(lat1_r) * math.cos(
+        lat2_r
+    ) * math.cos(dlon_r)
+    return (math.degrees(math.atan2(y, x)) + 360.0) % 360.0
 
 
 def _bbox_polygon(lat: float, lon: float, radius_km: float) -> str:
@@ -154,6 +169,7 @@ def find_nearest_stations(
                 lat=lat,
                 lon=lon,
                 distance_km=distance,
+                bearing_deg=_bearing_deg(location.lat, location.lon, lat, lon),
             )
         )
     stations.sort(key=lambda s: s.distance_km)

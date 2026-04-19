@@ -13,9 +13,16 @@ Tre typer push-varsel:
 - **Heads-up-varsel** (prioritet `default`, tittel "Heads-up: …"): når prognosen
   6–24 t fram viser et sammenhengende vindu som oppfyller samme kriterium.
 - **Observert-varsel** (prioritet `high`, tittel "OBS: …"): når en faktisk
-  måling fra nærmeste værstasjon (via MET Frost) oppfyller kriteriet nå. Fanger
-  opp når prognosen bommer. Krever `FROST_CLIENT_ID` (se nedenfor) — hvis den
-  ikke er satt, hopper agenten over observasjoner og sender kun prognose-varsel.
+  måling fra en nærliggende værstasjon (via MET Frost) oppfyller kriteriet nå.
+  Fanger opp når prognosen bommer. Krever `FROST_CLIENT_ID` (se nedenfor).
+
+  Stasjonsvalg er styrt av avstand og vindretning:
+  - Søkeradius: 25 km (stasjoner lenger unna ignoreres helt)
+  - Nær (≤ 15 km): varsler alltid når kriteriet er oppfylt
+  - Langt unna (15–25 km): varsler **kun** hvis stasjonen ligger oppstrøms —
+    altså i retningen vinden kommer fra — og derfor indikerer vær som er på
+    vei mot lokasjonen. Dette hindrer falske varsel fra stasjoner som måler
+    vær som ikke angår oss.
 
 Samme event varsles kun én gang per type (dedup via `wind_agent/state.json`).
 

@@ -52,10 +52,19 @@ FROST_SOURCES_URL: str = "https://frost.met.no/sources/v0.jsonld"
 FROST_OBSERVATIONS_URL: str = "https://frost.met.no/observations/v0.jsonld"
 
 # Antall nærmeste stasjoner vi sjekker per lokasjon.
-FROST_NEAREST_N: int = 3
+FROST_NEAREST_N: int = 5
 
-# Maks avstand til en stasjon for at observasjonene skal regnes som relevante (km).
-FROST_MAX_DISTANCE_KM: float = 15.0
+# Søkeradius: hvor langt vi leter etter værstasjoner (km).
+FROST_MAX_DISTANCE_KM: float = 25.0
+
+# Direkte-varsel-radius: stasjoner innen denne avstanden kan varsle uansett
+# hvor vinden kommer fra. Stasjoner lenger unna varsler kun hvis de ligger
+# "oppstrøms" — altså i retningen vinden kommer FRA — og derfor indikerer
+# været på vei mot lokasjonen.
+FROST_DIRECT_ALERT_KM: float = 15.0
+
+# Toleranse i grader for hva som regnes som "oppstrøms" (±tolerance fra vindretning).
+FROST_UPSTREAM_TOLERANCE_DEG: float = 45.0
 
 # Hvor mange minutter tilbake vi ser etter observasjoner.
 FROST_LOOKBACK_MIN: int = 60

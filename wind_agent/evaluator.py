@@ -9,6 +9,8 @@ from .config import (
     EAST_MIN_DEG,
     FORECAST_WINDOW_END_H,
     FORECAST_WINDOW_START_H,
+    FROST_DIRECT_ALERT_KM,
+    FROST_UPSTREAM_TOLERANCE_DEG,
     WIND_THRESHOLD_MS,
 )
 from .frost_client import Observation
@@ -86,10 +88,18 @@ class ObservedMatch:
     station_id: str
     station_name: str
     distance_km: float
+    bearing_deg: float
     time: datetime
     wind_from_direction: float
     wind_speed: float
     wind_speed_of_gust: float | None
+    is_upstream: bool
+
+
+def _angular_diff(a: float, b: float) -> float:
+    """Korteste vinkelforskjell mellom to grader (0–180)."""
+    d = abs(a - b) % 360.0
+    return min(d, 360.0 - d)
 
 
 def matches_observation(obs: Observation) -> bool:
@@ -103,22 +113,49 @@ def matches_observation(obs: Observation) -> bool:
     return east and strong
 
 
-def find_observation_match(observations: list[Observation]) -> ObservedMatch | None:
-    """Returner første observasjon som matcher, prioritert etter nærmeste stasjon.
+def _is_alert_eligible(obs: Observation) -> tuple[bool, bool]:
+    """Avgjør om en matchende observasjon skal gi varsel.
 
-    Forutsetter at listen allerede er sortert etter avstand (som Frost gir oss).
+    Returnerer (eligible, is_upstream):
+    - Nær stasjon (≤ FROST_DIRECT_ALERT_KM): eligible=True, is_upstream=True hvis
+      bearing sammenfaller med vindretning (informativt for alertmeldingen).
+    - Langt unna: eligible kun hvis stasjonen ligger oppstrøms, dvs. bearing fra
+      lokasjon til stasjon er innen FROST_UPSTREAM_TOLERANCE_DEG av
+      `wind_from_direction` (retningen vinden kommer FRA).
+    """
+    if obs.wind_from_direction is None:
+        return (False, False)
+    diff = _angular_diff(obs.station.bearing_deg, obs.wind_from_direction)
+    is_upstream = diff <= FROST_UPSTREAM_TOLERANCE_DEG
+    if obs.station.distance_km <= FROST_DIRECT_ALERT_KM:
+        return (True, is_upstream)
+    return (is_upstream, is_upstream)
+
+
+def find_observation_match(observations: list[Observation]) -> ObservedMatch | None:
+    """Returner første observasjon som matcher kriteriet OG er varselberettiget.
+
+    Stasjoner lengre unna enn FROST_DIRECT_ALERT_KM må ligge oppstrøms for at
+    deres observasjon skal trigge varsel. Dette hindrer varsel fra stasjoner
+    som måler vær som ikke er på vei mot oss.
     """
     for obs in observations:
-        if matches_observation(obs):
-            return ObservedMatch(
-                station_id=obs.station.id,
-                station_name=obs.station.name,
-                distance_km=obs.station.distance_km,
-                time=obs.time,
-                wind_from_direction=obs.wind_from_direction or 0.0,
-                wind_speed=obs.wind_speed or 0.0,
-                wind_speed_of_gust=obs.wind_speed_of_gust,
-            )
+        if not matches_observation(obs):
+            continue
+        eligible, is_upstream = _is_alert_eligible(obs)
+        if not eligible:
+            continue
+        return ObservedMatch(
+            station_id=obs.station.id,
+            station_name=obs.station.name,
+            distance_km=obs.station.distance_km,
+            bearing_deg=obs.station.bearing_deg,
+            time=obs.time,
+            wind_from_direction=obs.wind_from_direction or 0.0,
+            wind_speed=obs.wind_speed or 0.0,
+            wind_speed_of_gust=obs.wind_speed_of_gust,
+            is_upstream=is_upstream,
+        )
     return None
 
 

@@ -72,12 +72,19 @@ def send_observed_alert(location_name: str, match: ObservedMatch) -> None:
         if match.wind_speed_of_gust is not None
         else ""
     )
+    upstream_note = (
+        " — ligger oppstrøms, været er på vei mot dere"
+        if match.is_upstream and match.distance_km > 10
+        else ""
+    )
     title = (
         f"OBS: østlig vind målt {match.wind_speed:.1f} m/s "
         f"ved {match.station_name}"
     )
     body = (
-        f"Stasjon {match.station_name} ({match.distance_km:.1f} km fra {location_name})\n"
+        f"Stasjon {match.station_name} "
+        f"({match.distance_km:.1f} km {_compass(match.bearing_deg)} for {location_name}"
+        f"{upstream_note})\n"
         f"Måletid {_fmt_local(match.time)}:\n"
         f"  Retning {match.wind_from_direction:.0f}° "
         f"({_compass(match.wind_from_direction)}), "
