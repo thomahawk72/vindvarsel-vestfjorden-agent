@@ -1,3 +1,12 @@
 {
-  "locations": {}
+  "locations": {
+    "Bjerk\u00f8ya": {
+      "last_forecast_event_start": null,
+      "last_now_event_start": null
+    },
+    "Konglungen": {
+      "last_forecast_event_start": null,
+      "last_now_event_start": null
+    }
+  }
 }
