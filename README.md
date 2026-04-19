@@ -62,8 +62,22 @@ Alle terskler og koordinater ligger i
 - `LOCATIONS`: Konglungen og Bjerkøya (finjuster koordinatene om ønskelig).
 - `EAST_MIN_DEG` / `EAST_MAX_DEG`: 45°–135° (NØ–SØ). Stram inn til f.eks.
   70–110 for "strengt øst".
-- `WIND_THRESHOLD_MS`: 4.0 m/s (gjelder både middelvind og kast).
+- `WIND_THRESHOLD_MS`: 4.0 m/s (gjelder både middelvind og kast). Kan
+  overstyres uten kodeendring via GitHub Variable (se nedenfor).
 - `FORECAST_WINDOW_START_H` / `FORECAST_WINDOW_END_H`: 6–24 t.
+
+### Endre vindterskel uten å endre koden
+
+1. Gå til `Settings → Secrets and variables → Actions → Variables-fanen`.
+2. Klikk **"New repository variable"**.
+3. Navn: `WIND_THRESHOLD_MS`, verdi: f.eks. `6.5`.
+4. Lagre.
+
+Neste kjøring (hver halvtime eller via manuell dispatch) bruker den nye verdien
+automatisk. Scriptet logger gjeldende terskel ved starten av hver kjøring slik
+at du kan verifisere i Actions-loggen.
+
+Variabelen er valgfri — hvis den ikke er satt, brukes 4.0 fra `config.py`.
 
 ## Kjør lokalt
 

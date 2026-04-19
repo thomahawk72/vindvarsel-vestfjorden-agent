@@ -12,7 +12,14 @@ from datetime import datetime, timezone
 
 import requests
 
-from .config import LOCATIONS
+from .config import (
+    EAST_MAX_DEG,
+    EAST_MIN_DEG,
+    FORECAST_WINDOW_END_H,
+    FORECAST_WINDOW_START_H,
+    LOCATIONS,
+    WIND_THRESHOLD_MS,
+)
 from .evaluator import find_forecast_event, find_now_match
 from .met_client import fetch_forecast
 from .notifier import send_forecast_alert, send_now_alert
@@ -36,6 +43,14 @@ def run() -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     now = datetime.now(timezone.utc)
+    log.info(
+        "Config: østvindu %.0f-%.0f°, terskel %.1f m/s, prognose %d-%d t",
+        EAST_MIN_DEG,
+        EAST_MAX_DEG,
+        WIND_THRESHOLD_MS,
+        FORECAST_WINDOW_START_H,
+        FORECAST_WINDOW_END_H,
+    )
     state = load_state()
     session = requests.Session()
 
