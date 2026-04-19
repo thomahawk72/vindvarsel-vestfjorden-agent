@@ -1,0 +1,79 @@
+"""Push-varsling via ntfy.sh."""
+from __future__ import annotations
+
+import logging
+import os
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+import requests
+
+from .config import NTFY_SERVER
+from .evaluator import Event, MatchedHour
+
+log = logging.getLogger(__name__)
+
+OSLO_TZ = ZoneInfo("Europe/Oslo")
+
+
+def _topic() -> str:
+    topic = os.environ.get("NTFY_TOPIC", "").strip()
+    if not topic:
+        raise RuntimeError(
+            "NTFY_TOPIC mangler. Sett miljøvariabel eller GitHub Secret."
+        )
+    return topic
+
+
+def _compass(deg: float) -> str:
+    points = ["N", "NNØ", "NØ", "ØNØ", "Ø", "ØSØ", "SØ", "SSØ",
+              "S", "SSV", "SV", "VSV", "V", "VNV", "NV", "NNV"]
+    idx = int((deg % 360) / 22.5 + 0.5) % 16
+    return points[idx]
+
+
+def _fmt_local(t: datetime) -> str:
+    return t.astimezone(OSLO_TZ).strftime("%a %d.%m kl %H:%M")
+
+
+def _send(title: str, body: str, *, priority: str = "default", tags: str = "wind_face") -> None:
+    url = f"{NTFY_SERVER.rstrip('/')}/{_topic()}"
+    headers = {
+        "Title": title.encode("utf-8"),
+        "Priority": priority,
+        "Tags": tags,
+    }
+    log.info("Sender ntfy: %s", title)
+    resp = requests.post(url, data=body.encode("utf-8"), headers=headers, timeout=20)
+    resp.raise_for_status()
+
+
+def send_now_alert(location_name: str, hour: MatchedHour, *, extra_lines: list[str] | None = None) -> None:
+    gust_txt = (
+        f", kast {hour.wind_speed_of_gust:.1f} m/s"
+        if hour.wind_speed_of_gust is not None
+        else ""
+    )
+    title = f"Østlig vind {location_name} NÅ — {hour.wind_speed:.1f} m/s"
+    lines = [
+        f"{location_name} {_fmt_local(hour.time)}:",
+        f"  Retning {hour.wind_from_direction:.0f}° ({_compass(hour.wind_from_direction)}), "
+        f"vind {hour.wind_speed:.1f} m/s{gust_txt}",
+    ]
+    if extra_lines:
+        lines.extend(extra_lines)
+    _send(title, "\n".join(lines), priority="high", tags="wind_face,warning")
+
+
+def send_forecast_alert(location_name: str, event: Event) -> None:
+    lo, hi = event.dir_range
+    peak_gust = event.peak_gust
+    gust_txt = f", kast opp til {peak_gust:.1f} m/s" if peak_gust is not None else ""
+    title = f"Heads-up: østlig vind {location_name}"
+    body = (
+        f"Prognose {_fmt_local(event.start)} – {_fmt_local(event.end)} "
+        f"(varighet {len(event.hours)} t).\n"
+        f"Retning {lo:.0f}–{hi:.0f}° ({_compass((lo + hi) / 2)}), "
+        f"topp vind {event.peak_speed:.1f} m/s{gust_txt}."
+    )
+    _send(title, body, priority="default", tags="wind_face,calendar")
