@@ -117,6 +117,7 @@ def find_nearest_stations(
         "types": "SensorSystem",
         "elements": "wind_speed",
         "geometry": polygon,
+        "stationholder": "MET.NO",
         "fields": "id,name,geometry",
     }
     resp = sess.get(
@@ -174,7 +175,9 @@ def fetch_latest_observations(
     since = now - timedelta(minutes=lookback_min)
 
     source_ids = ",".join(s.id for s in stations)
-    elements = "wind_from_direction,wind_speed,max(wind_speed_of_gust PT1H)"
+    # Instantaneous-målinger: direkteverdier uten aggregering. Gust er valgfri
+    # og vil mangle for stasjoner som ikke måler kast — det er OK.
+    elements = "wind_from_direction,wind_speed,wind_speed_of_gust"
     params = {
         "sources": source_ids,
         "elements": elements,
@@ -187,8 +190,14 @@ def fetch_latest_observations(
         auth=_auth(sess),
         timeout=30,
     )
-    if resp.status_code == 404:
-        log.info("Ingen observasjoner de siste %d min for valgte stasjoner", lookback_min)
+    # 404 = ingen data i perioden. 412 = alle etterspurte elementer mangler for
+    # alle stasjoner i intervallet (Frost's måte å si "tomt"). Begge er OK.
+    if resp.status_code in (404, 412):
+        log.info(
+            "Ingen observasjoner de siste %d min for valgte stasjoner (HTTP %d)",
+            lookback_min,
+            resp.status_code,
+        )
         return []
     if resp.status_code == 401:
         raise FrostNotConfigured("FROST_CLIENT_ID avvist (401 Unauthorized).")
@@ -220,14 +229,13 @@ def fetch_latest_observations(
     results: list[Observation] = []
     for src_id, bucket in latest.items():
         values = bucket["values"]
-        gust_key = "max(wind_speed_of_gust PT1H)"
         results.append(
             Observation(
                 station=station_by_id[src_id],
                 time=bucket["time"],
                 wind_from_direction=values.get("wind_from_direction"),
                 wind_speed=values.get("wind_speed"),
-                wind_speed_of_gust=values.get(gust_key),
+                wind_speed_of_gust=values.get("wind_speed_of_gust"),
             )
         )
     return results
