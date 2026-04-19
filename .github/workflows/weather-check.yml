@@ -32,6 +32,7 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           MET_USER_AGENT: ${{ secrets.MET_USER_AGENT }}
+          FROST_CLIENT_ID: ${{ secrets.FROST_CLIENT_ID }}
           WIND_THRESHOLD_MS: ${{ vars.WIND_THRESHOLD_MS }}
         run: python -m wind_agent.check_wind
 

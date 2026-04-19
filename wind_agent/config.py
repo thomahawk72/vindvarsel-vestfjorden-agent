@@ -47,6 +47,19 @@ FORECAST_WINDOW_END_H: int = 24
 # MET Norway Locationforecast 2.0 compact endpoint.
 MET_ENDPOINT: str = "https://api.met.no/weatherapi/locationforecast/2.0/compact"
 
+# MET Frost API (sanntidsobservasjoner fra værstasjoner).
+FROST_SOURCES_URL: str = "https://frost.met.no/sources/v0.jsonld"
+FROST_OBSERVATIONS_URL: str = "https://frost.met.no/observations/v0.jsonld"
+
+# Antall nærmeste stasjoner vi sjekker per lokasjon.
+FROST_NEAREST_N: int = 3
+
+# Maks avstand til en stasjon for at observasjonene skal regnes som relevante (km).
+FROST_MAX_DISTANCE_KM: float = 15.0
+
+# Hvor mange minutter tilbake vi ser etter observasjoner.
+FROST_LOOKBACK_MIN: int = 60
+
 # ntfy.sh server. Kan overstyres hvis man kjører egen instans.
 NTFY_SERVER: str = "https://ntfy.sh"
 

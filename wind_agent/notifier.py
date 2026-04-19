@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from .config import NTFY_SERVER
-from .evaluator import Event, MatchedHour
+from .evaluator import Event, MatchedHour, ObservedMatch
 
 log = logging.getLogger(__name__)
 
@@ -63,6 +63,27 @@ def send_now_alert(location_name: str, hour: MatchedHour, *, extra_lines: list[s
     if extra_lines:
         lines.extend(extra_lines)
     _send(title, "\n".join(lines), priority="high", tags="wind_face,warning")
+
+
+def send_observed_alert(location_name: str, match: ObservedMatch) -> None:
+    """Varsel basert på faktisk måling fra nærmeste værstasjon."""
+    gust_txt = (
+        f", kast {match.wind_speed_of_gust:.1f} m/s"
+        if match.wind_speed_of_gust is not None
+        else ""
+    )
+    title = (
+        f"OBS: østlig vind målt {match.wind_speed:.1f} m/s "
+        f"ved {match.station_name}"
+    )
+    body = (
+        f"Stasjon {match.station_name} ({match.distance_km:.1f} km fra {location_name})\n"
+        f"Måletid {_fmt_local(match.time)}:\n"
+        f"  Retning {match.wind_from_direction:.0f}° "
+        f"({_compass(match.wind_from_direction)}), "
+        f"vind {match.wind_speed:.1f} m/s{gust_txt}"
+    )
+    _send(title, body, priority="high", tags="wind_face,warning,satellite")
 
 
 def send_forecast_alert(location_name: str, event: Event) -> None:

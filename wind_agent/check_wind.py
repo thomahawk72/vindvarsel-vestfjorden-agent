@@ -1,8 +1,9 @@
 """Hovedinngang: kjøres av GitHub Actions hvert 30. minutt.
 
-Henter prognose for hver lokasjon, evaluerer kriteriet og sender
-push-varsel via ntfy.sh for (a) nåværende time og (b) prognosevindu
-6–24 timer fram.
+Henter prognose og (hvis konfigurert) sanntidsobservasjoner for hver
+lokasjon, evaluerer kriteriet og sender push-varsel via ntfy.sh for
+(a) nåværende time (prognose), (b) prognosevindu 6–24 t fram og
+(c) faktiske målinger fra nærmeste værstasjon.
 """
 from __future__ import annotations
 
@@ -20,18 +21,26 @@ from .config import (
     LOCATIONS,
     WIND_THRESHOLD_MS,
 )
-from .evaluator import find_forecast_event, find_now_match
+from .evaluator import find_forecast_event, find_now_match, find_observation_match
+from .frost_client import (
+    FrostNotConfigured,
+    fetch_latest_observations,
+    find_nearest_stations,
+)
 from .met_client import fetch_forecast
-from .notifier import send_forecast_alert, send_now_alert
+from .notifier import send_forecast_alert, send_now_alert, send_observed_alert
 from .state import (
     clear_forecast,
     clear_now,
+    clear_observed,
     load_state,
     mark_notified_forecast,
     mark_notified_now,
+    mark_notified_observed,
     save_state,
     should_notify_forecast,
     should_notify_now,
+    should_notify_observed,
 )
 
 log = logging.getLogger("wind_agent")
@@ -55,6 +64,7 @@ def run() -> int:
     session = requests.Session()
 
     any_error = False
+    frost_enabled = True
 
     for loc in LOCATIONS:
         log.info("Henter prognose for %s (%.4f, %.4f)", loc.name, loc.lat, loc.lon)
@@ -97,6 +107,48 @@ def run() -> int:
                 "Prognose-event for %s allerede varslet (%s)",
                 loc.name,
                 forecast_event.start,
+            )
+
+        if not frost_enabled:
+            continue
+        try:
+            stations = find_nearest_stations(loc, session=session)
+            if not stations:
+                log.info("Ingen Frost-stasjoner innenfor maks avstand for %s", loc.name)
+                clear_observed(state, loc.name)
+                continue
+            log.info(
+                "Frost-stasjoner for %s: %s",
+                loc.name,
+                ", ".join(f"{s.name} ({s.distance_km:.1f} km)" for s in stations),
+            )
+            observations = fetch_latest_observations(stations, session=session)
+        except FrostNotConfigured as exc:
+            log.warning("Hopper over observasjoner: %s", exc)
+            frost_enabled = False
+            continue
+        except Exception as exc:  # noqa: BLE001
+            log.error("Feil ved henting av observasjoner for %s: %s", loc.name, exc)
+            any_error = True
+            continue
+
+        observed_match = find_observation_match(observations)
+        if observed_match is None:
+            clear_observed(state, loc.name)
+        elif should_notify_observed(state, loc.name, observed_match.time):
+            try:
+                send_observed_alert(loc.name, observed_match)
+                mark_notified_observed(state, loc.name, observed_match.time)
+            except Exception as exc:  # noqa: BLE001
+                log.error(
+                    "Feil ved ntfy-varsel (observert) for %s: %s", loc.name, exc
+                )
+                any_error = True
+        else:
+            log.info(
+                "Observert match for %s allerede varslet (%s)",
+                loc.name,
+                observed_match.time,
             )
 
     save_state(state)

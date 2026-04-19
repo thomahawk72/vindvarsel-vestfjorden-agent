@@ -6,14 +6,18 @@ sender push-varsel via [ntfy.sh](https://ntfy.sh).
 
 ## Hva varsles?
 
-To typer push-varsel:
+Tre typer push-varsel:
 
-- **Nå-varsel** (prioritet `high`): når neste prognose-time (0–1,5 t) har
-  vindretning 45°–135° og vind eller kast > 4 m/s.
-- **Heads-up-varsel** (prioritet `default`): når prognosen 6–24 t fram viser
-  et sammenhengende vindu som oppfyller samme kriterium.
+- **Nå-varsel** (prioritet `high`, tittel "Østlig vind … NÅ"): når neste
+  prognose-time (0–1,5 t) har vindretning 45°–135° og vind eller kast > 4 m/s.
+- **Heads-up-varsel** (prioritet `default`, tittel "Heads-up: …"): når prognosen
+  6–24 t fram viser et sammenhengende vindu som oppfyller samme kriterium.
+- **Observert-varsel** (prioritet `high`, tittel "OBS: …"): når en faktisk
+  måling fra nærmeste værstasjon (via MET Frost) oppfyller kriteriet nå. Fanger
+  opp når prognosen bommer. Krever `FROST_CLIENT_ID` (se nedenfor) — hvis den
+  ikke er satt, hopper agenten over observasjoner og sender kun prognose-varsel.
 
-Samme event varsles kun én gang (dedup via `wind_agent/state.json`).
+Samme event varsles kun én gang per type (dedup via `wind_agent/state.json`).
 
 ## Oppsett
 
@@ -36,13 +40,26 @@ cd vindvarsel-vestfjorden
 
 Gå til `Settings → Secrets and variables → Actions` og legg til:
 
-| Secret           | Verdi (eksempel)                                       |
-| ---------------- | ------------------------------------------------------ |
-| `NTFY_TOPIC`     | `vestfjorden-vind-xk29ab`                              |
-| `MET_USER_AGENT` | `VestfjordenVindAgent/1.0 din.epost@example.com`       |
+| Secret             | Verdi (eksempel)                                       | Obligatorisk |
+| ------------------ | ------------------------------------------------------ | ------------ |
+| `NTFY_TOPIC`       | `vestfjorden-vind-xk29ab`                              | Ja           |
+| `MET_USER_AGENT`   | `VestfjordenVindAgent/1.0 din.epost@example.com`       | Ja           |
+| `FROST_CLIENT_ID`  | UUID fra frost.met.no (se under)                       | Nei          |
 
 MET krever en beskrivende `User-Agent` med kontakt-info —
 se deres [ToS](https://api.met.no/doc/TermsOfService).
+
+### Valgfritt: Sanntidsobservasjoner via Frost
+
+For å aktivere "OBS:"-varsler basert på faktiske målinger fra nærmeste
+værstasjon:
+
+1. Registrer en gratis konto på
+   https://frost.met.no/auth/requestCredentials.html (tar ~2 min).
+2. Kopier `client_id` (en UUID).
+3. Legg den inn som GitHub Secret `FROST_CLIENT_ID`.
+
+Uten denne secret kjører agenten fortsatt, men bruker kun prognose.
 
 ### 4. Aktiver workflow
 

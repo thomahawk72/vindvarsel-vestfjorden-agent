@@ -41,10 +41,16 @@ def save_state(state: dict[str, Any], path: Path = STATE_FILE) -> None:
 
 
 def _loc_entry(state: dict[str, Any], location_name: str) -> dict[str, Any]:
-    return state["locations"].setdefault(
+    entry = state["locations"].setdefault(
         location_name,
-        {"last_now_event_start": None, "last_forecast_event_start": None},
+        {
+            "last_now_event_start": None,
+            "last_forecast_event_start": None,
+            "last_observed_event_start": None,
+        },
     )
+    entry.setdefault("last_observed_event_start", None)
+    return entry
 
 
 def should_notify_now(state: dict[str, Any], location_name: str, event_time: datetime) -> bool:
@@ -75,3 +81,20 @@ def mark_notified_forecast(
 
 def clear_forecast(state: dict[str, Any], location_name: str) -> None:
     _loc_entry(state, location_name)["last_forecast_event_start"] = None
+
+
+def should_notify_observed(
+    state: dict[str, Any], location_name: str, event_time: datetime
+) -> bool:
+    entry = _loc_entry(state, location_name)
+    return entry.get("last_observed_event_start") != event_time.isoformat()
+
+
+def mark_notified_observed(
+    state: dict[str, Any], location_name: str, event_time: datetime
+) -> None:
+    _loc_entry(state, location_name)["last_observed_event_start"] = event_time.isoformat()
+
+
+def clear_observed(state: dict[str, Any], location_name: str) -> None:
+    _loc_entry(state, location_name)["last_observed_event_start"] = None

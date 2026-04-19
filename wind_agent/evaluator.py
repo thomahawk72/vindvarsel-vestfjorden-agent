@@ -11,6 +11,7 @@ from .config import (
     FORECAST_WINDOW_START_H,
     WIND_THRESHOLD_MS,
 )
+from .frost_client import Observation
 from .met_client import WindSample
 
 
@@ -75,6 +76,49 @@ def find_now_match(samples: list[WindSample], *, now: datetime | None = None) ->
             return None
         if matches(s):
             return _sample_to_matched(s)
+    return None
+
+
+@dataclass(frozen=True)
+class ObservedMatch:
+    """En observasjon fra én stasjon som oppfyller kriteriet."""
+
+    station_id: str
+    station_name: str
+    distance_km: float
+    time: datetime
+    wind_from_direction: float
+    wind_speed: float
+    wind_speed_of_gust: float | None
+
+
+def matches_observation(obs: Observation) -> bool:
+    """Samme kriterium som for prognose, men på en målt observasjon."""
+    if obs.wind_from_direction is None:
+        return False
+    east = EAST_MIN_DEG <= obs.wind_from_direction <= EAST_MAX_DEG
+    spd = obs.wind_speed or 0.0
+    gust = obs.wind_speed_of_gust or 0.0
+    strong = spd > WIND_THRESHOLD_MS or gust > WIND_THRESHOLD_MS
+    return east and strong
+
+
+def find_observation_match(observations: list[Observation]) -> ObservedMatch | None:
+    """Returner første observasjon som matcher, prioritert etter nærmeste stasjon.
+
+    Forutsetter at listen allerede er sortert etter avstand (som Frost gir oss).
+    """
+    for obs in observations:
+        if matches_observation(obs):
+            return ObservedMatch(
+                station_id=obs.station.id,
+                station_name=obs.station.name,
+                distance_km=obs.station.distance_km,
+                time=obs.time,
+                wind_from_direction=obs.wind_from_direction or 0.0,
+                wind_speed=obs.wind_speed or 0.0,
+                wind_speed_of_gust=obs.wind_speed_of_gust,
+            )
     return None
 
 
