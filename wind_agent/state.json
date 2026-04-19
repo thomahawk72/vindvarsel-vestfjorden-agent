@@ -2,12 +2,12 @@
   "locations": {
     "Bjerk\u00f8ya": {
       "last_forecast_event_start": "2026-04-20T08:00:00+00:00",
-      "last_now_event_start": "2026-04-19T17:00:00+00:00",
+      "last_now_event_start": "2026-04-19T18:00:00+00:00",
       "last_observed_event_start": null
     },
     "Konglungen": {
-      "last_forecast_event_start": "2026-04-20T03:00:00+00:00",
-      "last_now_event_start": "2026-04-19T17:00:00+00:00",
+      "last_forecast_event_start": "2026-04-20T08:00:00+00:00",
+      "last_now_event_start": "2026-04-19T18:00:00+00:00",
       "last_observed_event_start": null
     }
   }
