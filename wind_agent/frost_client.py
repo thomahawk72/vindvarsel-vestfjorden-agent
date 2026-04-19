@@ -9,6 +9,7 @@ Dokumentasjon: https://frost.met.no/howto.html
 from __future__ import annotations
 
 import logging
+import math
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -68,20 +69,55 @@ def _auth(session: requests.Session) -> tuple[str, str]:
     return (_client_id(), "")
 
 
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Stor-sirkel-avstand i km mellom to punkter."""
+    r = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1))
+        * math.cos(math.radians(lat2))
+        * math.sin(dlon / 2) ** 2
+    )
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def _bbox_polygon(lat: float, lon: float, radius_km: float) -> str:
+    """BBOX-polygon rundt et punkt (grov konvertering — god nok for stasjonssøk)."""
+    dlat = radius_km / 111.0
+    dlon = radius_km / (111.0 * math.cos(math.radians(lat)) or 1.0)
+    lat_min, lat_max = lat - dlat, lat + dlat
+    lon_min, lon_max = lon - dlon, lon + dlon
+    return (
+        f"POLYGON(("
+        f"{lon_min} {lat_min}, "
+        f"{lon_min} {lat_max}, "
+        f"{lon_max} {lat_max}, "
+        f"{lon_max} {lat_min}, "
+        f"{lon_min} {lat_min}"
+        f"))"
+    )
+
+
 def find_nearest_stations(
     location: Location,
     *,
     n: int = FROST_NEAREST_N,
     session: requests.Session | None = None,
 ) -> list[Station]:
-    """Returner inntil n stasjoner nærmest lokasjonen som har vinddata."""
+    """Returner inntil n stasjoner nærmest lokasjonen som har vinddata.
+
+    Bruker POLYGON-søk + selvberegnet avstand (Frost v0 støtter ikke
+    `nearestmaxcount`, og `nearest(POINT(...))` gir kun én stasjon).
+    """
     sess = session or requests.Session()
+    polygon = _bbox_polygon(location.lat, location.lon, FROST_MAX_DISTANCE_KM)
     params = {
         "types": "SensorSystem",
         "elements": "wind_speed",
-        "geometry": f"nearest(POINT({location.lon} {location.lat}))",
-        "nearestmaxcount": str(n),
-        "fields": "id,name,geometry,distance",
+        "geometry": polygon,
+        "fields": "id,name,geometry",
     }
     resp = sess.get(
         FROST_SOURCES_URL,
@@ -91,29 +127,36 @@ def find_nearest_stations(
     )
     if resp.status_code == 401:
         raise FrostNotConfigured("FROST_CLIENT_ID avvist (401 Unauthorized).")
+    if resp.status_code == 404:
+        log.info("Ingen stasjoner funnet i boks rundt %s", location.name)
+        return []
     resp.raise_for_status()
     data = resp.json().get("data", [])
 
     stations: list[Station] = []
     for item in data:
-        geom = item.get("geometry", {})
-        coords = geom.get("coordinates") or [None, None]
-        lon, lat = coords[0], coords[1]
-        if lon is None or lat is None:
+        geom = item.get("geometry") or {}
+        coords = geom.get("coordinates") or []
+        if len(coords) < 2:
             continue
-        distance = float(item.get("distance", 0.0))
+        lon, lat = float(coords[0]), float(coords[1])
+        distance = _haversine_km(location.lat, location.lon, lat, lon)
         if distance > FROST_MAX_DISTANCE_KM:
+            continue
+        station_id = item.get("id")
+        if not station_id:
             continue
         stations.append(
             Station(
-                id=item["id"],
-                name=item.get("name", item["id"]),
-                lat=float(lat),
-                lon=float(lon),
+                id=station_id,
+                name=item.get("name") or station_id,
+                lat=lat,
+                lon=lon,
                 distance_km=distance,
             )
         )
-    return stations
+    stations.sort(key=lambda s: s.distance_km)
+    return stations[:n]
 
 
 def fetch_latest_observations(

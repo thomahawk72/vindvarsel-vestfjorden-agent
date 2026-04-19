@@ -113,23 +113,38 @@ def run() -> int:
             continue
         try:
             stations = find_nearest_stations(loc, session=session)
-            if not stations:
-                log.info("Ingen Frost-stasjoner innenfor maks avstand for %s", loc.name)
-                clear_observed(state, loc.name)
-                continue
-            log.info(
-                "Frost-stasjoner for %s: %s",
+        except FrostNotConfigured as exc:
+            log.warning("Hopper over observasjoner: %s", exc)
+            frost_enabled = False
+            continue
+        except Exception:
+            log.exception(
+                "Frost-stasjonssøk feilet for %s — hopper over observasjoner",
                 loc.name,
-                ", ".join(f"{s.name} ({s.distance_km:.1f} km)" for s in stations),
             )
+            continue
+
+        if not stations:
+            log.info("Ingen Frost-stasjoner innenfor maks avstand for %s", loc.name)
+            clear_observed(state, loc.name)
+            continue
+        log.info(
+            "Frost-stasjoner for %s: %s",
+            loc.name,
+            ", ".join(f"{s.name} ({s.distance_km:.1f} km)" for s in stations),
+        )
+
+        try:
             observations = fetch_latest_observations(stations, session=session)
         except FrostNotConfigured as exc:
             log.warning("Hopper over observasjoner: %s", exc)
             frost_enabled = False
             continue
-        except Exception as exc:  # noqa: BLE001
-            log.error("Feil ved henting av observasjoner for %s: %s", loc.name, exc)
-            any_error = True
+        except Exception:
+            log.exception(
+                "Frost-observasjonshenting feilet for %s — hopper over",
+                loc.name,
+            )
             continue
 
         observed_match = find_observation_match(observations)
@@ -139,10 +154,8 @@ def run() -> int:
             try:
                 send_observed_alert(loc.name, observed_match)
                 mark_notified_observed(state, loc.name, observed_match.time)
-            except Exception as exc:  # noqa: BLE001
-                log.error(
-                    "Feil ved ntfy-varsel (observert) for %s: %s", loc.name, exc
-                )
+            except Exception:
+                log.exception("Feil ved ntfy-varsel (observert) for %s", loc.name)
                 any_error = True
         else:
             log.info(
