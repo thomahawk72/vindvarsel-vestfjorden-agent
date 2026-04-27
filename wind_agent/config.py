@@ -69,6 +69,22 @@ FROST_UPSTREAM_TOLERANCE_DEG: float = 45.0
 # Hvor mange minutter tilbake vi ser etter observasjoner.
 FROST_LOOKBACK_MIN: int = 60
 
+# Cerbo GX / Signal K MQTT. Hvis CERBO_MQTT_URL ikke er satt, hoppes denne
+# datakilden over og agenten bruker MET/Frost som før.
+CERBO_MQTT_URL: str = os.environ.get("CERBO_MQTT_URL", "").strip()
+CERBO_MQTT_USERNAME: str = os.environ.get("CERBO_MQTT_USERNAME", "").strip()
+CERBO_MQTT_PASSWORD: str = os.environ.get("CERBO_MQTT_PASSWORD", "").strip()
+CERBO_MQTT_TOPIC_FILTER: str = os.environ.get("CERBO_MQTT_TOPIC_FILTER", "#").strip() or "#"
+CERBO_MQTT_TIMEOUT_SEC: float = _float_from_env("CERBO_MQTT_TIMEOUT_SEC", 8.0)
+CERBO_MQTT_FRESH_MAX_MIN: float = _float_from_env("CERBO_MQTT_FRESH_MAX_MIN", 15.0)
+CERBO_SOURCE_NAME: str = os.environ.get("CERBO_SOURCE_NAME", "Cerbo GX").strip() or "Cerbo GX"
+
+# Signal K headingMagnetic er magnetisk. Sett lokal misvisning i grader øst
+# positivt hvis du vil konvertere til tilnærmet sann retning.
+CERBO_MAGNETIC_DECLINATION_DEG: float = _float_from_env(
+    "CERBO_MAGNETIC_DECLINATION_DEG", 0.0
+)
+
 # ntfy.sh server. Kan overstyres hvis man kjører egen instans.
 NTFY_SERVER: str = "https://ntfy.sh"
 

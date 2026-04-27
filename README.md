@@ -14,7 +14,9 @@ Tre typer push-varsel:
   6–24 t fram viser et sammenhengende vindu som oppfyller samme kriterium.
 - **Observert-varsel** (prioritet `high`, tittel "OBS: …"): når en faktisk
   måling fra en nærliggende værstasjon (via MET Frost) oppfyller kriteriet nå.
-  Fanger opp når prognosen bommer. Krever `FROST_CLIENT_ID` (se nedenfor).
+  Fanger opp når prognosen bommer. Hvis Cerbo GX / Signal K MQTT er konfigurert,
+  brukes ferske på-stedet-data som primær realtime-kilde. Ellers brukes Frost
+  som fallback. Frost krever `FROST_CLIENT_ID` (se nedenfor).
 
   Stasjonsvalg er styrt av avstand og vindretning:
   - Søkeradius: 25 km (stasjoner lenger unna ignoreres helt)
@@ -67,6 +69,52 @@ værstasjon:
 3. Legg den inn som GitHub Secret `FROST_CLIENT_ID`.
 
 Uten denne secret kjører agenten fortsatt, men bruker kun prognose.
+
+### Valgfritt: Realtime vind fra Cerbo GX / Signal K via MQTT
+
+For å kombinere prognose med reelle på-stedet-data kan Cerbo GX publisere
+Signal K-felter til en ekstern MQTT-broker over TLS. Agenten leser siste
+retained-meldinger ved hver kjøring og bruker dem som realtime-observasjon når
+de er ferske.
+
+På Cerbo / Signal K MQTT Push sendes disse pathene:
+
+```text
+environment.wind.speedApparent
+environment.wind.angleApparent
+navigation.headingMagnetic
+```
+
+Signal K bruker SI-enheter: `speedApparent` i m/s, og både `angleApparent` og
+`headingMagnetic` i radianer. Agenten beregner vindretning slik:
+
+```text
+wind_from_direction = headingMagnetic + angleApparent
+```
+
+Legg inn disse GitHub Secrets for brukeren GitHub Actions skal lese MQTT med:
+
+```text
+CERBO_MQTT_URL=mqtts://<broker-host>:8883
+CERBO_MQTT_USERNAME=<mqtt-bruker>
+CERBO_MQTT_PASSWORD=<mqtt-passord>
+```
+
+Anbefalte GitHub Variables:
+
+```text
+CERBO_MQTT_TOPIC_FILTER=#
+CERBO_MQTT_FRESH_MAX_MIN=15
+CERBO_SOURCE_NAME=Cerbo GX
+CERBO_MAGNETIC_DECLINATION_DEG=0
+```
+
+Bruk begrensede MQTT-brukere i broker: Cerbo trenger publish-rettighet, mens
+GitHub Actions trenger subscribe-rettighet. Under test kan topic filter være
+`#`; stram det inn til det faktiske Signal K-topicet når du ser meldinger i
+broker. Sett `retain=true` i Signal K MQTT Push hvis pluginen tilbyr det, slik
+at GitHub Actions kan hente siste verdi uten å være online akkurat når Cerbo
+publiserer.
 
 ### 4. Aktiver workflow
 
@@ -124,6 +172,7 @@ Scriptet logger til stdout og skriver oppdatert `wind_agent/state.json`.
 wind_agent/
   __init__.py
   check_wind.py     # hovedinngang
+  cerbo_client.py   # Cerbo GX / Signal K MQTT realtime-observasjon
   config.py         # koordinater, terskler, vinduer
   met_client.py     # MET Locationforecast + enkel cache
   evaluator.py      # kriterielogikk, now + forecast event

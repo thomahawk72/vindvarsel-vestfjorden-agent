@@ -34,6 +34,13 @@ jobs:
           MET_USER_AGENT: ${{ secrets.MET_USER_AGENT }}
           FROST_CLIENT_ID: ${{ secrets.FROST_CLIENT_ID }}
           WIND_THRESHOLD_MS: ${{ vars.WIND_THRESHOLD_MS }}
+          CERBO_MQTT_URL: ${{ secrets.CERBO_MQTT_URL }}
+          CERBO_MQTT_USERNAME: ${{ secrets.CERBO_MQTT_USERNAME }}
+          CERBO_MQTT_PASSWORD: ${{ secrets.CERBO_MQTT_PASSWORD }}
+          CERBO_MQTT_TOPIC_FILTER: ${{ vars.CERBO_MQTT_TOPIC_FILTER }}
+          CERBO_MQTT_FRESH_MAX_MIN: ${{ vars.CERBO_MQTT_FRESH_MAX_MIN }}
+          CERBO_SOURCE_NAME: ${{ vars.CERBO_SOURCE_NAME }}
+          CERBO_MAGNETIC_DECLINATION_DEG: ${{ vars.CERBO_MAGNETIC_DECLINATION_DEG }}
         run: python -m wind_agent.check_wind
 
       - name: Commit updated state

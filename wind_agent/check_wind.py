@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 import requests
 
+from .cerbo_client import CerboNotConfigured, fetch_cerbo_observation
 from .config import (
     EAST_MAX_DEG,
     EAST_MIN_DEG,
@@ -65,6 +66,22 @@ def run() -> int:
 
     any_error = False
     frost_enabled = True
+    cerbo_observation = None
+    try:
+        cerbo_observation = fetch_cerbo_observation()
+        if cerbo_observation is None:
+            log.info("Ingen fersk Cerbo/Signal K-observasjon tilgjengelig")
+        else:
+            log.info(
+                "Cerbo/Signal K: %s %.1f m/s fra %.0f°",
+                cerbo_observation.time.isoformat(),
+                cerbo_observation.wind_speed or 0.0,
+                cerbo_observation.wind_from_direction or 0.0,
+            )
+    except CerboNotConfigured as exc:
+        log.info("Hopper over Cerbo/Signal K MQTT: %s", exc)
+    except Exception:
+        log.exception("Cerbo/Signal K MQTT feilet — bruker MET/Frost videre")
 
     for loc in LOCATIONS:
         log.info("Henter prognose for %s (%.4f, %.4f)", loc.name, loc.lat, loc.lon)
@@ -108,6 +125,29 @@ def run() -> int:
                 loc.name,
                 forecast_event.start,
             )
+
+        if cerbo_observation is not None:
+            cerbo_match = find_observation_match([cerbo_observation])
+            if cerbo_match is None:
+                clear_observed(state, loc.name)
+            elif should_notify_observed(state, loc.name, cerbo_match.time):
+                try:
+                    send_observed_alert(loc.name, cerbo_match)
+                    mark_notified_observed(state, loc.name, cerbo_match.time)
+                except Exception:
+                    log.exception(
+                        "Feil ved ntfy-varsel (Cerbo-observert) for %s",
+                        loc.name,
+                    )
+                    any_error = True
+            else:
+                log.info(
+                    "Cerbo-observert match for %s allerede varslet (%s)",
+                    loc.name,
+                    cerbo_match.time,
+                )
+            # Cerbo er på-stedet-data og er derfor primær realtime-kilde.
+            continue
 
         if not frost_enabled:
             continue
