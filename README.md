@@ -104,6 +104,7 @@ Anbefalte GitHub Variables:
 
 ```text
 CERBO_MQTT_TOPIC_FILTER=#
+CERBO_MQTT_TIMEOUT_SEC=40
 CERBO_MQTT_FRESH_MAX_MIN=15
 CERBO_SOURCE_NAME=Cerbo GX
 CERBO_MAGNETIC_DECLINATION_DEG=0
@@ -112,9 +113,10 @@ CERBO_MAGNETIC_DECLINATION_DEG=0
 Bruk begrensede MQTT-brukere i broker: Cerbo trenger publish-rettighet, mens
 GitHub Actions trenger subscribe-rettighet. Under test kan topic filter være
 `#`; stram det inn til det faktiske Signal K-topicet når du ser meldinger i
-broker. Sett `retain=true` i Signal K MQTT Push hvis pluginen tilbyr det, slik
-at GitHub Actions kan hente siste verdi uten å være online akkurat når Cerbo
-publiserer.
+broker. Med 30-sekunders publisering fra Cerbo bør `CERBO_MQTT_TIMEOUT_SEC`
+være minst 35-40 sekunder hvis pluginen ikke sender retained meldinger. Sett
+`retain=true` i Signal K MQTT Push hvis pluginen tilbyr det, slik at GitHub
+Actions kan hente siste verdi uten å være online akkurat når Cerbo publiserer.
 
 ### 4. Aktiver workflow
 

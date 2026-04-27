@@ -75,7 +75,7 @@ CERBO_MQTT_URL: str = os.environ.get("CERBO_MQTT_URL", "").strip()
 CERBO_MQTT_USERNAME: str = os.environ.get("CERBO_MQTT_USERNAME", "").strip()
 CERBO_MQTT_PASSWORD: str = os.environ.get("CERBO_MQTT_PASSWORD", "").strip()
 CERBO_MQTT_TOPIC_FILTER: str = os.environ.get("CERBO_MQTT_TOPIC_FILTER", "#").strip() or "#"
-CERBO_MQTT_TIMEOUT_SEC: float = _float_from_env("CERBO_MQTT_TIMEOUT_SEC", 8.0)
+CERBO_MQTT_TIMEOUT_SEC: float = _float_from_env("CERBO_MQTT_TIMEOUT_SEC", 40.0)
 CERBO_MQTT_FRESH_MAX_MIN: float = _float_from_env("CERBO_MQTT_FRESH_MAX_MIN", 15.0)
 CERBO_SOURCE_NAME: str = os.environ.get("CERBO_SOURCE_NAME", "Cerbo GX").strip() or "Cerbo GX"
 
