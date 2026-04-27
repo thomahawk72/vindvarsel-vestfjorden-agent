@@ -18,6 +18,7 @@ import requests
 from dateutil.parser import isoparse
 
 from .config import CACHE_DIR, MET_ENDPOINT, Location
+from .http_retry import request_with_retries
 
 
 @dataclass(frozen=True)
@@ -77,7 +78,14 @@ def fetch_forecast(location: Location, *, session: requests.Session | None = Non
         headers["If-Modified-Since"] = last_modified
 
     params = {"lat": f"{location.lat:.4f}", "lon": f"{location.lon:.4f}"}
-    resp = sess.get(MET_ENDPOINT, params=params, headers=headers, timeout=30)
+    resp = request_with_retries(
+        sess,
+        "GET",
+        MET_ENDPOINT,
+        params=params,
+        headers=headers,
+        timeout=30,
+    )
 
     if resp.status_code == 304 and cached:
         body = cached["body"]

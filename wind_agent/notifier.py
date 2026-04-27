@@ -10,6 +10,7 @@ import requests
 
 from .config import NTFY_SERVER
 from .evaluator import Event, MatchedHour, ObservedMatch
+from .http_retry import request_with_retries
 
 log = logging.getLogger(__name__)
 
@@ -44,8 +45,21 @@ def _send(title: str, body: str, *, priority: str = "default", tags: str = "wind
         "Tags": tags,
     }
     log.info("Sender ntfy: %s", title)
-    resp = requests.post(url, data=body.encode("utf-8"), headers=headers, timeout=20)
-    resp.raise_for_status()
+    session = requests.Session()
+    resp = request_with_retries(
+        session,
+        "POST",
+        url,
+        data=body.encode("utf-8"),
+        headers=headers,
+        timeout=20,
+        log_url=f"{NTFY_SERVER.rstrip('/')}/<topic>",
+    )
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError:
+        log.error("ntfy svarte med HTTP %s: %s", resp.status_code, resp.text[:300])
+        raise
 
 
 def send_now_alert(location_name: str, hour: MatchedHour, *, extra_lines: list[str] | None = None) -> None:
