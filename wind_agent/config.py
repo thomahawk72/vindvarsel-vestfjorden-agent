@@ -40,6 +40,9 @@ EAST_MAX_DEG: float = 135.0
 # Kan overstyres via miljøvariabel WIND_THRESHOLD_MS (GitHub Actions Variable).
 WIND_THRESHOLD_MS: float = _float_from_env("WIND_THRESHOLD_MS", 4.0)
 
+# Hvor ofte samme aktive match kan varsles på nytt.
+ALERT_REPEAT_MIN: float = _float_from_env("ALERT_REPEAT_MIN", 10.0)
+
 # Prognosevindu for "heads-up"-varsel (timer fram i tid).
 FORECAST_WINDOW_START_H: int = 6
 FORECAST_WINDOW_END_H: int = 24
@@ -75,7 +78,7 @@ CERBO_MQTT_URL: str = os.environ.get("CERBO_MQTT_URL", "").strip()
 CERBO_MQTT_USERNAME: str = os.environ.get("CERBO_MQTT_USERNAME", "").strip()
 CERBO_MQTT_PASSWORD: str = os.environ.get("CERBO_MQTT_PASSWORD", "").strip()
 CERBO_MQTT_TOPIC_FILTER: str = os.environ.get("CERBO_MQTT_TOPIC_FILTER", "#").strip() or "#"
-CERBO_MQTT_TIMEOUT_SEC: float = _float_from_env("CERBO_MQTT_TIMEOUT_SEC", 40.0)
+CERBO_MQTT_TIMEOUT_SEC: float = _float_from_env("CERBO_MQTT_TIMEOUT_SEC", 540.0)
 CERBO_MQTT_FRESH_MAX_MIN: float = _float_from_env("CERBO_MQTT_FRESH_MAX_MIN", 15.0)
 CERBO_SOURCE_NAME: str = os.environ.get("CERBO_SOURCE_NAME", "Cerbo GX").strip() or "Cerbo GX"
 

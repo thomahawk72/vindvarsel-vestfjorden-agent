@@ -1,7 +1,7 @@
 # Vindvarsel Vestfjorden
 
 Agent som varsler når vinden i Vestfjorden (rundt Konglungen og Bjerkøya) er
-østlig og over 4 m/s. Kjøres gratis av GitHub Actions hvert 30. minutt og
+østlig og over 4 m/s. Kjøres gratis av GitHub Actions hvert 10. minutt og
 sender push-varsel via [ntfy.sh](https://ntfy.sh).
 
 ## Hva varsles?
@@ -26,7 +26,8 @@ Tre typer push-varsel:
     vei mot lokasjonen. Dette hindrer falske varsel fra stasjoner som måler
     vær som ikke angår oss.
 
-Samme event varsles kun én gang per type (dedup via `wind_agent/state.json`).
+Samme aktive event kan varsles på nytt hvert 10. minutt, styrt av
+`ALERT_REPEAT_MIN` og dedup-state i `wind_agent/state.json`.
 
 ## Oppsett
 
@@ -85,6 +86,11 @@ environment.wind.angleApparent
 navigation.headingMagnetic
 ```
 
+Sett intervallet i Signal K MQTT Push til 480 sekunder (8 minutter). Agenten
+lytter i 540 sekunder, slik at den rekker minst én live-publisering uten
+retained messages og fortsatt normalt blir ferdig før neste 10-minutters
+workflow-kjøring.
+
 Signal K bruker SI-enheter: `speedApparent` i m/s, og både `angleApparent` og
 `headingMagnetic` i radianer. Agenten beregner vindretning slik:
 
@@ -104,8 +110,9 @@ Anbefalte GitHub Variables:
 
 ```text
 CERBO_MQTT_TOPIC_FILTER=#
-CERBO_MQTT_TIMEOUT_SEC=40
+CERBO_MQTT_TIMEOUT_SEC=540
 CERBO_MQTT_FRESH_MAX_MIN=15
+ALERT_REPEAT_MIN=10
 CERBO_SOURCE_NAME=Cerbo GX
 CERBO_MAGNETIC_DECLINATION_DEG=0
 ```
@@ -113,16 +120,17 @@ CERBO_MAGNETIC_DECLINATION_DEG=0
 Bruk begrensede MQTT-brukere i broker: Cerbo trenger publish-rettighet, mens
 GitHub Actions trenger subscribe-rettighet. Under test kan topic filter være
 `#`; stram det inn til det faktiske Signal K-topicet når du ser meldinger i
-broker. Med 30-sekunders publisering fra Cerbo bør `CERBO_MQTT_TIMEOUT_SEC`
-være minst 35-40 sekunder hvis pluginen ikke sender retained meldinger. Sett
-`retain=true` i Signal K MQTT Push hvis pluginen tilbyr det, slik at GitHub
-Actions kan hente siste verdi uten å være online akkurat når Cerbo publiserer.
+broker. Med 8-minutters publisering fra Cerbo bør `CERBO_MQTT_TIMEOUT_SEC`
+være rundt 540 sekunder hvis pluginen ikke sender retained meldinger. Sett
+`retain=true` i Signal K MQTT Push hvis pluginen tilbyr det; da kan timeouten
+senkes kraftig fordi GitHub Actions kan hente siste verdi uten å være online
+akkurat når Cerbo publiserer.
 
 ### 4. Aktiver workflow
 
 Workflowen er konfigurert i `.github/workflows/weather-check.yml` og kjøres:
 
-- automatisk hvert 30. minutt (cron `*/30 * * * *`)
+- automatisk hvert 10. minutt (cron `*/10 * * * *`)
 - manuelt via `Actions → Vindvarsel Vestfjorden → Run workflow`
 
 Etter første vellykkede kjøring kan du teste varslingen ved å midlertidig
@@ -139,6 +147,8 @@ Alle terskler og koordinater ligger i
 - `WIND_THRESHOLD_MS`: 4.0 m/s (gjelder både middelvind og kast). Kan
   overstyres uten kodeendring via GitHub Variable (se nedenfor).
 - `FORECAST_WINDOW_START_H` / `FORECAST_WINDOW_END_H`: 6–24 t.
+- `ALERT_REPEAT_MIN`: 10 min. Samme aktive match kan varsles på nytt etter
+  dette intervallet.
 
 ### Endre vindterskel uten å endre koden
 
@@ -147,7 +157,7 @@ Alle terskler og koordinater ligger i
 3. Navn: `WIND_THRESHOLD_MS`, verdi: f.eks. `6.5`.
 4. Lagre.
 
-Neste kjøring (hver halvtime eller via manuell dispatch) bruker den nye verdien
+Neste kjøring (hver 10. minutt eller via manuell dispatch) bruker den nye verdien
 automatisk. Scriptet logger gjeldende terskel ved starten av hver kjøring slik
 at du kan verifisere i Actions-loggen.
 

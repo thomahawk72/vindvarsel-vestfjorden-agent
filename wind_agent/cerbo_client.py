@@ -79,6 +79,7 @@ def fetch_cerbo_observation() -> Observation | None:
         heading_deg + angle_deg + CERBO_MAGNETIC_DECLINATION_DEG
     ) % 360.0
 
+    observation_hour = oldest_time.replace(minute=0, second=0, microsecond=0)
     return Observation(
         station=Station(
             id="cerbo-gx",
@@ -88,7 +89,7 @@ def fetch_cerbo_observation() -> Observation | None:
             distance_km=0.0,
             bearing_deg=wind_from_direction,
         ),
-        time=oldest_time,
+        time=observation_hour,
         wind_from_direction=wind_from_direction,
         wind_speed=speed,
         wind_speed_of_gust=None,

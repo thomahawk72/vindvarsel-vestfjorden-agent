@@ -1,4 +1,4 @@
-"""Hovedinngang: kjøres av GitHub Actions hvert 30. minutt.
+"""Hovedinngang: kjøres av GitHub Actions hvert 10. minutt.
 
 Henter prognose og (hvis konfigurert) sanntidsobservasjoner for hver
 lokasjon, evaluerer kriteriet og sender push-varsel via ntfy.sh for
@@ -15,6 +15,7 @@ import requests
 
 from .cerbo_client import CerboNotConfigured, fetch_cerbo_observation
 from .config import (
+    ALERT_REPEAT_MIN,
     EAST_MAX_DEG,
     EAST_MIN_DEG,
     FORECAST_WINDOW_END_H,
@@ -54,12 +55,13 @@ def run() -> int:
     )
     now = datetime.now(timezone.utc)
     log.info(
-        "Config: østvindu %.0f-%.0f°, terskel %.1f m/s, prognose %d-%d t",
+        "Config: østvindu %.0f-%.0f°, terskel %.1f m/s, prognose %d-%d t, repeat %.0f min",
         EAST_MIN_DEG,
         EAST_MAX_DEG,
         WIND_THRESHOLD_MS,
         FORECAST_WINDOW_START_H,
         FORECAST_WINDOW_END_H,
+        ALERT_REPEAT_MIN,
     )
     state = load_state()
     session = requests.Session()
@@ -99,10 +101,10 @@ def run() -> int:
         now_match = find_now_match(samples, now=now)
         if now_match is None:
             clear_now(state, loc.name)
-        elif should_notify_now(state, loc.name, now_match.time):
+        elif should_notify_now(state, loc.name, now=now):
             try:
                 send_now_alert(loc.name, now_match)
-                mark_notified_now(state, loc.name, now_match.time)
+                mark_notified_now(state, loc.name, now_match.time, now=now)
             except Exception as exc:  # noqa: BLE001
                 log.error("Feil ved ntfy-varsel (nå) for %s: %s", loc.name, exc)
                 any_error = True
@@ -112,10 +114,12 @@ def run() -> int:
         forecast_event = find_forecast_event(samples, now=now)
         if forecast_event is None:
             clear_forecast(state, loc.name)
-        elif should_notify_forecast(state, loc.name, forecast_event.start):
+        elif should_notify_forecast(state, loc.name, now=now):
             try:
                 send_forecast_alert(loc.name, forecast_event)
-                mark_notified_forecast(state, loc.name, forecast_event.start)
+                mark_notified_forecast(
+                    state, loc.name, forecast_event.start, now=now
+                )
             except Exception as exc:  # noqa: BLE001
                 log.error("Feil ved ntfy-varsel (prognose) for %s: %s", loc.name, exc)
                 any_error = True
@@ -130,10 +134,10 @@ def run() -> int:
             cerbo_match = find_observation_match([cerbo_observation])
             if cerbo_match is None:
                 clear_observed(state, loc.name)
-            elif should_notify_observed(state, loc.name, cerbo_match.time):
+            elif should_notify_observed(state, loc.name, now=now):
                 try:
                     send_observed_alert(loc.name, cerbo_match)
-                    mark_notified_observed(state, loc.name, cerbo_match.time)
+                    mark_notified_observed(state, loc.name, cerbo_match.time, now=now)
                 except Exception:
                     log.exception(
                         "Feil ved ntfy-varsel (Cerbo-observert) for %s",
@@ -193,10 +197,12 @@ def run() -> int:
         observed_match = find_observation_match(observations)
         if observed_match is None:
             clear_observed(state, loc.name)
-        elif should_notify_observed(state, loc.name, observed_match.time):
+        elif should_notify_observed(state, loc.name, now=now):
             try:
                 send_observed_alert(loc.name, observed_match)
-                mark_notified_observed(state, loc.name, observed_match.time)
+                mark_notified_observed(
+                    state, loc.name, observed_match.time, now=now
+                )
             except Exception:
                 log.exception("Feil ved ntfy-varsel (observert) for %s", loc.name)
                 any_error = True
