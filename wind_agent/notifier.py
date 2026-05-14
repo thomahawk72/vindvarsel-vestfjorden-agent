@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -15,6 +16,16 @@ from .http_retry import request_with_retries
 log = logging.getLogger(__name__)
 
 OSLO_TZ = ZoneInfo("Europe/Oslo")
+
+
+@dataclass
+class AlertItem:
+    """Éin ventande varseloppføring frå éin lokasjon og kjelde."""
+
+    location_name: str
+    alert_type: str  # "now", "observed", "forecast"
+    data: MatchedHour | ObservedMatch | Event
+    source: str  # "MET", "Frost", "Cerbo"
 
 
 def _topic() -> str:
@@ -119,3 +130,110 @@ def send_forecast_alert(location_name: str, event: Event) -> None:
         f"topp vind {event.peak_speed:.1f} m/s{gust_txt}."
     )
     _send(title, body, priority="default", tags="wind_face,calendar")
+
+
+# ---------------------------------------------------------------------------
+# Kombinert varsel
+# ---------------------------------------------------------------------------
+
+def _fmt_time_short(t: datetime) -> str:
+    """Berre klokkeslett i lokal tid."""
+    return t.astimezone(OSLO_TZ).strftime("%H:%M")
+
+
+def _format_now_line(item: AlertItem) -> str:
+    hour: MatchedHour = item.data  # type: ignore[assignment]
+    gust_txt = (
+        f", kast {hour.wind_speed_of_gust:.1f} m/s"
+        if hour.wind_speed_of_gust is not None
+        else ""
+    )
+    return (
+        f"{item.location_name} NÅ ({item.source}): "
+        f"{hour.wind_speed:.1f} m/s frå {_compass(hour.wind_from_direction)} "
+        f"({hour.wind_from_direction:.0f}°){gust_txt}"
+    )
+
+
+def _format_observed_line(item: AlertItem) -> str:
+    match: ObservedMatch = item.data  # type: ignore[assignment]
+    gust_txt = (
+        f", kast {match.wind_speed_of_gust:.1f} m/s"
+        if match.wind_speed_of_gust is not None
+        else ""
+    )
+    dist_txt = f" {match.distance_km:.1f} km" if match.distance_km > 0.5 else ""
+    return (
+        f"{item.location_name} ({item.source}{dist_txt}): "
+        f"{match.wind_speed:.1f} m/s frå {_compass(match.wind_from_direction)} "
+        f"({match.wind_from_direction:.0f}°){gust_txt} "
+        f"kl {_fmt_time_short(match.time)}"
+    )
+
+
+def _format_forecast_line(item: AlertItem) -> str:
+    event: Event = item.data  # type: ignore[assignment]
+    lo, hi = event.dir_range
+    gust_txt = (
+        f", kast {event.peak_gust:.1f} m/s"
+        if event.peak_gust is not None
+        else ""
+    )
+    end_time = _fmt_time_short(event.end)
+    return (
+        f"{item.location_name} (prognose {item.source}): "
+        f"{_fmt_local(event.start)}–{end_time}, "
+        f"topp {event.peak_speed:.1f} m/s frå {_compass((lo + hi) / 2)}{gust_txt}"
+    )
+
+
+def send_combined_alert(alerts: list[AlertItem]) -> None:
+    """Send éi kombinert ntfy-melding som samlar alle ventande varslar.
+
+    Rekkjefølgje: nå-data og observasjonar fyrst (høg prioritet), deretter
+    prognosedata. Dersom ei lokasjon har både nå-match og prognose med
+    høgare toppfart, vert det flagga som aukande vind.
+    """
+    if not alerts:
+        return
+
+    high_prio = [a for a in alerts if a.alert_type in ("now", "observed")]
+    low_prio = [a for a in alerts if a.alert_type == "forecast"]
+
+    # Finn lokasjonar med aukande vind (nå-match + prognose med høgare toppfart)
+    now_speeds: dict[str, float] = {}
+    for a in high_prio:
+        if a.alert_type == "now":
+            hour: MatchedHour = a.data  # type: ignore[assignment]
+            now_speeds[a.location_name] = hour.wind_speed
+    increasing_locs: set[str] = set()
+    for a in low_prio:
+        event: Event = a.data  # type: ignore[assignment]
+        if a.location_name in now_speeds and event.peak_speed > now_speeds[a.location_name]:
+            increasing_locs.add(a.location_name)
+
+    # Tittel og prioritet basert på om det er aktiv vind no
+    unique_locs = list(dict.fromkeys(a.location_name for a in alerts))
+    if high_prio:
+        active_locs = list(dict.fromkeys(a.location_name for a in high_prio))
+        title = f"Østlig vind NÅ — {', '.join(active_locs)}"
+        priority = "high"
+        tags = "wind_face,warning"
+    else:
+        title = f"Heads-up: østlig vind — {', '.join(unique_locs)}"
+        priority = "default"
+        tags = "wind_face,calendar"
+
+    lines: list[str] = []
+    for a in high_prio:
+        if a.alert_type == "now":
+            line = _format_now_line(a)
+        else:
+            line = _format_observed_line(a)
+        if a.location_name in increasing_locs:
+            line += " ↑ aukande"
+        lines.append(line)
+    for a in low_prio:
+        lines.append(_format_forecast_line(a))
+
+    _send(title, "\n".join(lines), priority=priority, tags=tags)

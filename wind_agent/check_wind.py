@@ -1,14 +1,15 @@
 """Hovedinngang: kjøres av GitHub Actions hvert 10. minutt.
 
 Henter prognose og (hvis konfigurert) sanntidsobservasjoner for hver
-lokasjon, evaluerer kriteriet og sender push-varsel via ntfy.sh for
-(a) nåværende time (prognose), (b) prognosevindu 6–24 t fram og
-(c) faktiske målinger fra nærmeste værstasjon.
+lokasjon, evaluerer kriteriet og sender push-varsel via ntfy.sh.
+Alle matches frå alle lokasjonar og kjelder vert samla og sendt som
+éi kombinert ntfy-melding per kjøring.
 """
 from __future__ import annotations
 
 import logging
 import sys
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 import requests
@@ -30,7 +31,7 @@ from .frost_client import (
     find_nearest_stations,
 )
 from .met_client import fetch_forecast
-from .notifier import send_forecast_alert, send_now_alert, send_observed_alert
+from .notifier import AlertItem, send_combined_alert
 from .state import (
     clear_forecast,
     clear_now,
@@ -85,6 +86,9 @@ def run() -> int:
     except Exception:
         log.exception("Cerbo/Signal K MQTT feilet — bruker MET/Frost videre")
 
+    # Samle alle ventande varslar: (AlertItem, mark_fn)
+    pending: list[tuple[AlertItem, Callable[[], None]]] = []
+
     for loc in LOCATIONS:
         log.info("Henter prognose for %s (%.4f, %.4f)", loc.name, loc.lat, loc.lon)
         try:
@@ -102,12 +106,11 @@ def run() -> int:
         if now_match is None:
             clear_now(state, loc.name)
         elif should_notify_now(state, loc.name, now=now):
-            try:
-                send_now_alert(loc.name, now_match)
-                mark_notified_now(state, loc.name, now_match.time, now=now)
-            except Exception as exc:  # noqa: BLE001
-                log.error("Feil ved ntfy-varsel (nå) for %s: %s", loc.name, exc)
-                any_error = True
+            _lname, _t = loc.name, now_match.time
+            pending.append((
+                AlertItem(_lname, "now", now_match, "MET"),
+                lambda lname=_lname, t=_t: mark_notified_now(state, lname, t, now=now),
+            ))
         else:
             log.info("Nå-match for %s allerede varslet (%s)", loc.name, now_match.time)
 
@@ -115,14 +118,11 @@ def run() -> int:
         if forecast_event is None:
             clear_forecast(state, loc.name)
         elif should_notify_forecast(state, loc.name, now=now):
-            try:
-                send_forecast_alert(loc.name, forecast_event)
-                mark_notified_forecast(
-                    state, loc.name, forecast_event.start, now=now
-                )
-            except Exception as exc:  # noqa: BLE001
-                log.error("Feil ved ntfy-varsel (prognose) for %s: %s", loc.name, exc)
-                any_error = True
+            _lname, _t = loc.name, forecast_event.start
+            pending.append((
+                AlertItem(_lname, "forecast", forecast_event, "MET"),
+                lambda lname=_lname, t=_t: mark_notified_forecast(state, lname, t, now=now),
+            ))
         else:
             log.info(
                 "Prognose-event for %s allerede varslet (%s)",
@@ -135,15 +135,13 @@ def run() -> int:
             if cerbo_match is None:
                 clear_observed(state, loc.name)
             elif should_notify_observed(state, loc.name, now=now):
-                try:
-                    send_observed_alert(loc.name, cerbo_match)
-                    mark_notified_observed(state, loc.name, cerbo_match.time, now=now)
-                except Exception:
-                    log.exception(
-                        "Feil ved ntfy-varsel (Cerbo-observert) for %s",
-                        loc.name,
-                    )
-                    any_error = True
+                _lname, _t = loc.name, cerbo_match.time
+                pending.append((
+                    AlertItem(_lname, "observed", cerbo_match, "Cerbo"),
+                    lambda lname=_lname, t=_t: mark_notified_observed(
+                        state, lname, t, now=now
+                    ),
+                ))
             else:
                 log.info(
                     "Cerbo-observert match for %s allerede varslet (%s)",
@@ -198,20 +196,37 @@ def run() -> int:
         if observed_match is None:
             clear_observed(state, loc.name)
         elif should_notify_observed(state, loc.name, now=now):
-            try:
-                send_observed_alert(loc.name, observed_match)
-                mark_notified_observed(
-                    state, loc.name, observed_match.time, now=now
-                )
-            except Exception:
-                log.exception("Feil ved ntfy-varsel (observert) for %s", loc.name)
-                any_error = True
+            _lname, _t = loc.name, observed_match.time
+            pending.append((
+                AlertItem(_lname, "observed", observed_match, "Frost"),
+                lambda lname=_lname, t=_t: mark_notified_observed(
+                    state, lname, t, now=now
+                ),
+            ))
         else:
             log.info(
                 "Observert match for %s allerede varslet (%s)",
                 loc.name,
                 observed_match.time,
             )
+
+    # Send éi kombinert melding for alle ventande varslar
+    if pending:
+        alert_items = [item for item, _ in pending]
+        log.info(
+            "Sender kombinert ntfy-varsel med %d oppføring(ar): %s",
+            len(alert_items),
+            ", ".join(f"{a.location_name}/{a.alert_type}" for a in alert_items),
+        )
+        try:
+            send_combined_alert(alert_items)
+            for _, mark_fn in pending:
+                mark_fn()
+        except Exception:
+            log.exception("Feil ved sending av kombinert ntfy-varsel")
+            any_error = True
+    else:
+        log.info("Ingen nye varslar å sende denne kjøringa.")
 
     save_state(state)
     return 1 if any_error else 0
