@@ -5,16 +5,16 @@
       "last_forecast_notified_at": null,
       "last_now_event_start": null,
       "last_now_notified_at": null,
-      "last_observed_event_start": "2026-05-15T23:30:00+00:00",
-      "last_observed_notified_at": "2026-05-15T23:32:07.310938+00:00"
+      "last_observed_event_start": "2026-05-16T00:00:00+00:00",
+      "last_observed_notified_at": "2026-05-16T00:00:54.508878+00:00"
     },
     "Konglungen": {
       "last_forecast_event_start": null,
       "last_forecast_notified_at": null,
       "last_now_event_start": null,
       "last_now_notified_at": null,
-      "last_observed_event_start": "2026-05-15T23:30:00+00:00",
-      "last_observed_notified_at": "2026-05-15T23:32:07.310938+00:00"
+      "last_observed_event_start": "2026-05-16T00:00:00+00:00",
+      "last_observed_notified_at": "2026-05-16T00:00:54.508878+00:00"
     }
   }
 }
