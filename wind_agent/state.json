@@ -9,8 +9,8 @@
       "last_observed_notified_at": null
     },
     "Konglungen": {
-      "last_forecast_event_start": "2026-06-04T11:00:00+00:00",
-      "last_forecast_notified_at": "2026-06-04T00:16:49.080527+00:00",
+      "last_forecast_event_start": null,
+      "last_forecast_notified_at": null,
       "last_now_event_start": null,
       "last_now_notified_at": null,
       "last_observed_event_start": null,
