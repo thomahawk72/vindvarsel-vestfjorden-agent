@@ -3,8 +3,8 @@
     "Bjerk\u00f8ya": {
       "last_forecast_event_start": null,
       "last_forecast_notified_at": null,
-      "last_now_event_start": "2026-07-02T13:00:00+00:00",
-      "last_now_notified_at": "2026-07-02T13:05:48.950060+00:00",
+      "last_now_event_start": null,
+      "last_now_notified_at": null,
       "last_observed_event_start": null,
       "last_observed_notified_at": null
     },
