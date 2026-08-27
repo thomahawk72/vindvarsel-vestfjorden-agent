@@ -1,16 +1,16 @@
 {
   "locations": {
     "Bjerk\u00f8ya": {
-      "last_forecast_event_start": null,
-      "last_forecast_notified_at": null,
+      "last_forecast_event_start": "2026-08-28T12:00:00+00:00",
+      "last_forecast_notified_at": "2026-08-27T20:46:28.238360+00:00",
       "last_now_event_start": null,
       "last_now_notified_at": null,
       "last_observed_event_start": null,
       "last_observed_notified_at": null
     },
     "Konglungen": {
-      "last_forecast_event_start": null,
-      "last_forecast_notified_at": null,
+      "last_forecast_event_start": "2026-08-28T12:00:00+00:00",
+      "last_forecast_notified_at": "2026-08-27T20:46:28.238360+00:00",
       "last_now_event_start": null,
       "last_now_notified_at": null,
       "last_observed_event_start": null,
